@@ -62,9 +62,8 @@ int main(int argc, char *argv[]) {
     int ierr;
     double mesh_size_ratio;
     if ((argc < 3) || (sscanf(argv[2], "%lf", &mesh_size_ratio)) != 1) {
-        printf("Usage: \n./deformation <model> <mesh_size_ratio>\n");
+        printf("Usage: \n./deformation <model> <lc> <T> <dt> <initial.txt> <final.txt> <time.txt> <I>\n");
         printf("model: one of the model implemented in models/\n");
-        printf("mesh_size_ratio: mesh size factor\n");
         return -1;
     }
 
@@ -100,30 +99,66 @@ int main(int argc, char *argv[]) {
     // Devoir 3
 
     // Récup ux_i uy_i vx_i vy_i de <initial.txt>
-    int n = Kbd->n;
+    int nnz = Ksp->nnz;
+    int n = Ksp->n;
+    printf("nnz  = %d\n", nnz);
+    printf("n  = %d\n", n);
 
+    // Récup condition initiale --> ds les quels on va stocker les ux_i uy_i vx_i vy_i au temps T
     double *uxi = (double *)malloc( n * sizeof(double));
     double *uyi = (double *)malloc( n * sizeof(double));
-    double *uvxi = (double *)malloc( n * sizeof(double));
-    double *uvyi = (double *)malloc( n * sizeof(double));
-    n = get_intial_condition(argv[5], uxi, uyi, uvxi, uvyi);
+    double *vxi = (double *)malloc( n * sizeof(double));
+    double *vyi = (double *)malloc( n * sizeof(double));
+    n = get_intial_condition(argv[5], uxi, uyi, vxi, vyi);
     printf("n  = %d\n", n);
+
+    int T = atoi(argv[3]); // Temps total
+    double dt = atof(argv[4]); // Pas de temps
+    int node_I = atoi(argv[8]); // Nœud I
+
+    if (T <= 0 || dt <= 0) {
+        printf("Erreur : T et dt doivent être des valeurs positives.\n");
+        return -1;
+    }
+
+    // On vas stocker les uxI uyI vxI vyI du nœud I à chaque itération temporelle
+    double *uxI = (double *)malloc( T * sizeof(double));
+    double *uyI = (double *)malloc( T * sizeof(double));
+    double *vxI = (double *)malloc( T * sizeof(double));
+    double *vyI = (double *)malloc( T * sizeof(double));
+    double *t = (double *)malloc( T * sizeof(double));
 
 
     // Newmark computation
-    double *t = (double *)malloc( n * sizeof(double));
-    //...
+    newmark(
+        uxi, uyi, vxi, vyi,
+        uxI, uyI, vxI, vyI, t,
+        Ksp->data, Msp->data,
+        T, node_I,
+        dt,
+        n
+    );
 
 
     // Stockage solution dans <final.txt> : le déplacement et la vitesse au temps T, au même format que le fichier <initial.txt>
-    stock_final(n, argv[6], uxi, uyi, uvxi, uvyi);
+    stock_final(n, argv[6], uxi, uyi, vxi, vyi);
     
 
     // Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle
-    stock_time(n, argv[7], t, uxi, uyi, uvxi, uvyi);
-    
+    stock_time(T, argv[7], t, uxI, uyI, vxI, vyI);
 
 
+
+    free(uxi);
+    free(uyi);
+    free(vxi);
+    free(vyi);
+
+    free(uxI);
+    free(uyI);
+    free(vxI);
+    free(vyI);
+    free(t);
     // fin modif
     
     // Free stuff

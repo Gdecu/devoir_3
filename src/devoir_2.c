@@ -129,8 +129,8 @@ int get_intial_condition(
     const char *filename,
     double *uxi,
     double *uyi,
-    double *uvxi,
-    double *uvyi
+    double *vxi,
+    double *vyi
 ) {
     FILE *fp = fopen(filename, "r");
     if (fp == NULL) {
@@ -139,7 +139,7 @@ int get_intial_condition(
     }
 
     int i = 0;
-    while (fscanf(fp, "%lf %lf %lf %lf", &uxi[i], &uyi[i], &uvxi[i], &uvyi[i]) == 4) {
+    while (fscanf(fp, "%lf %lf %lf %lf", &uxi[i], &uyi[i], &vxi[i], &vyi[i]) == 4) {
         i++;
     }
 
@@ -153,8 +153,8 @@ void stock_final(int n,
     const char *filename,
     double *uxi,
     double *uyi,
-    double *uvxi,
-    double *uvyi
+    double *vxi,
+    double *vyi
 ) {
     FILE *fp = fopen(filename, "w");
     if (fp == NULL) {
@@ -163,7 +163,7 @@ void stock_final(int n,
     }
 
     for (int i = 0; i < n; i++) {
-        fprintf(fp, "%lf %lf %lf %lf\n", uxi[i], uyi[i], uvxi[i], uvyi[i]);
+        fprintf(fp, "%lf %lf %lf %lf\n", uxi[i], uyi[i], vxi[i], vyi[i]);
     }
 
     fclose(fp);
@@ -172,13 +172,13 @@ void stock_final(int n,
 
 // Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle
 void stock_time(
-    int n,
+    int T,
     const char *filename,
     double *t,
     double *uxi,
     double *uyi,
-    double *uvxi,
-    double *uvyi
+    double *vxi,
+    double *vyi
 ) {
     FILE *fp = fopen(filename, "w");
     if (fp == NULL) {
@@ -186,9 +186,45 @@ void stock_time(
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < n; i++) {
-        fprintf(fp, "%lf %lf %lf %lf %lf\n",t[i], uxi[i], uyi[i], uvxi[i], uvyi[i]);
+    for (int i = 0; i < T; i++) {
+        fprintf(fp, "%lf %lf %lf %lf %lf\n",t[i], uxi[i], uyi[i], vxi[i], vyi[i]);
     }
 
     fclose(fp);
+}
+
+
+void newmark(
+    double *uxi, double *uyi, double *vxi, double *vyi,
+    double *uxI, double *uyI, double *vxI, double *vyI, double *t,
+    double *K, double *M,
+    double T, int node_I,
+    double dt,
+    int n
+) {
+    
+    for (int i = 0; i < T; i++) {
+
+        // Newmark iteration
+        newmark_iter(uxi, uyi, vxi, vyi, M, K, n);
+
+        // Stockage de uxI uyI vxI vyI du nœud I à chaque itération temporelle
+        uxI[i] = uxi[node_I];
+        uyI[i] = uyi[node_I];
+        vxI[i] = vxi[node_I];
+        vyI[i] = vyi[node_I];
+        // Stockage du temps
+        t[i] = i * dt; // ou t[i] = i ???
+        // printf("t[%d] = %lf\n", i, t[i]);
+    }
+}
+
+/*
+Effectue une itération de la méthode de Newmark
+*/
+void newmark_iter(
+    double *uxi, double *uyi, double *vxi, double *vyi,
+    double *M, double *K,
+    int n
+) {
 }
