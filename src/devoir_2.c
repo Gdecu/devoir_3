@@ -1,5 +1,4 @@
 #include "devoir_2.h"
-#include <cblas.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -193,38 +192,118 @@ void stock_time(
     fclose(fp);
 }
 
+void build_effective_matrix(
+    int n,
+    const int *rows_idx,
+    const int *cols,
+    const double *Kval,
+    const double *M,
+    double *A_eff,
+    double beta,
+    double h
+) {
+    double coeff = beta * h * h;
+
+    for (int i = 0; i < n; i++) {
+        for (int j = rows_idx[i]; j < rows_idx[i + 1]; j++) {
+            int col = cols[j];
+            A_eff[j] = coeff * Kval[j];
+            if (i == col) {
+                A_eff[j] += M[i]; 
+            }
+        }
+    }
+}
+
+
 
 void newmark(
     double *uxi, double *uyi, double *vxi, double *vyi,
     double *uxI, double *uyI, double *vxI, double *vyI, double *t,
-    double *K, double *M,
-    double T, int node_I,
+    double *Kval, double *M,
+    double T_final, int node_I,
     double dt,
     int n
 ) {
-    
+    int T = (int)(T_final / dt);
+    double beta = 0.25;
+    double gamma = 0.5;
+
+    extern int *rows_idx, *cols;
+    double *A_eff = (double *)malloc(rows_idx[n] * sizeof(double));
+
+    build_effective_matrix(n, rows_idx, cols, Kval, M, A_eff, beta, dt);
+
     for (int i = 0; i < T; i++) {
+        // Itération Newmark pour chaque direction
+        newmark_iter(uxi, M, Kval, A_eff, rows_idx, cols, dt, beta, gamma, n);
+        newmark_iter(uyi, M, Kval, A_eff, rows_idx, cols, dt, beta, gamma, n);
+        newmark_iter(vxi, M, Kval, A_eff, rows_idx, cols, dt, beta, gamma, n);
+        newmark_iter(vyi, M, Kval, A_eff, rows_idx, cols, dt, beta, gamma, n);
 
-        // Newmark iteration
-        newmark_iter(uxi, uyi, vxi, vyi, M, K, n);
-
-        // Stockage de uxI uyI vxI vyI du nœud I à chaque itération temporelle
+        // Stockage du noeud d'intérêt
         uxI[i] = uxi[node_I];
         uyI[i] = uyi[node_I];
         vxI[i] = vxi[node_I];
         vyI[i] = vyi[node_I];
-        // Stockage du temps
-        t[i] = i * dt; // ou t[i] = i ???
-        // printf("t[%d] = %lf\n", i, t[i]);
+        t[i] = i * dt;
     }
+
+    free(A_eff);
 }
 
-/*
-Effectue une itération de la méthode de Newmark
-*/
+
 void newmark_iter(
-    double *uxi, double *uyi, double *vxi, double *vyi,
-    double *M, double *K,
+    double *q, // uxi / uyi / vxi / vyi
+    double *M,
+    double *K,
+    double *A_eff, // matrice M + β h^2 K
+    int *rows_idx,
+    int *cols,
+    double h,
+    double beta,
+    double gamma,
     int n
 ) {
+    double *p = (double *)malloc(n * sizeof(double));
+    double *rhs = (double *)malloc(n * sizeof(double));
+    double *qn1 = (double *)malloc(n * sizeof(double));
+    double *Kq = (double *)malloc(n * sizeof(double));
+    double *tmp = (double *)malloc(n * sizeof(double));
+
+    // p_n = M * q̇_n
+    for (int i = 0; i < n; i++) {
+        p[i] = M[i] * q[i]; // q = q̇ ici
+    }
+
+    // K * q_n
+    Matvec(n, rows_idx, cols, K, q, Kq);
+
+    // RHS = (M - h²/2 (1 - 2β) K) * q + h * p
+    for (int i = 0; i < n; i++) {
+        rhs[i] = (M[i] - h * h / 2 * (1 - 2 * beta) * Kq[i]) * q[i] + h * p[i];
+    }
+
+    // Résolution A_eff * q_{n+1} = rhs
+    CG(n, rows_idx, cols, A_eff, rhs, qn1, 1e-10);
+
+    // tmp = (1 - γ) * q + γ * qn1
+    for (int i = 0; i < n; i++) {
+        tmp[i] = (1 - gamma) * q[i] + gamma * qn1[i];
+    }
+
+    Matvec(n, rows_idx, cols, K, tmp, Kq);
+
+    // p_{n+1} = p - h * K * tmp
+    for (int i = 0; i < n; i++) {
+        p[i] -= h * Kq[i];
+    }
+
+    // q_{n+1} = qn1, q̇_{n+1} = p / M
+    for (int i = 0; i < n; i++) {
+        q[i] = qn1[i];
+        q[i] = p[i] / M[i]; // q est maintenant q̇
+    }
+
+    free(p); free(rhs); free(qn1); free(Kq); free(tmp);
 }

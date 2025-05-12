@@ -5,7 +5,6 @@
 #include "gmshc.h"
 #include "../gmsh-sdk/include/gmshc.h"
 #include <math.h>
-#include <cblas.h>
 #include <gmshc.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,7 +92,7 @@ int main(int argc, char *argv[]) {
     CSRMatrix *Msp = band_to_sym_csr(Mbd);
     double eps = 1e-8;
     CG(Ksp->n, Ksp->row_ptr, Ksp->col_idx, Ksp->data, rhs, sol, eps);    
-    //display_sol(model, sol);
+    // display_sol(model, sol);
 
     // Début modif
     // Devoir 3
