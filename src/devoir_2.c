@@ -218,92 +218,107 @@ void build_effective_matrix(
 
 
 void newmark(
-    double *uxi, double *uyi, double *vxi, double *vyi,
-    double *uxI, double *uyI, double *vxI, double *vyI, double *t,
-    double *Kval, double *M,
-    double T_final, int node_I,
-    double dt,
-    int n
+    double *uxi, double *uyi,      // initialisations u
+    double *vxi, double *vyi,      // initialisations v
+    double *uxI, double *uyI,      // sorties du nœud I
+    double *vxI, double *vyI,
+    double *t,                      // temps
+    double *Kval, double *Mdiag,    // CSR K et vecteur M
+    double Tfinal, int node_I,
+    double dt, int n_nodes
 ) {
-    int T = (int)(T_final / dt);
-    double beta = 0.25;
-    double gamma = 0.5;
+    int N    = 2 * n_nodes;                // DOF
+    int T    = (int)round(Tfinal / dt);
+    double β = 0.25, γ = 0.5;
 
-    extern int *rows_idx, *cols;
-    double *A_eff = (double *)malloc(rows_idx[n] * sizeof(double));
+    extern int *rows_idx, *cols;           // définis par ta lecture CSR
+    double *Aeff = malloc(rows_idx[N] * sizeof(double));
+    build_effective_matrix(N, rows_idx, cols, Kval, Mdiag, Aeff, β, dt);
 
-    build_effective_matrix(n, rows_idx, cols, Kval, M, A_eff, beta, dt);
-
-    for (int i = 0; i < T; i++) {
-        // Itération Newmark pour chaque direction
-        newmark_iter(uxi, M, Kval, A_eff, rows_idx, cols, dt, beta, gamma, n);
-        newmark_iter(uyi, M, Kval, A_eff, rows_idx, cols, dt, beta, gamma, n);
-        newmark_iter(vxi, M, Kval, A_eff, rows_idx, cols, dt, beta, gamma, n);
-        newmark_iter(vyi, M, Kval, A_eff, rows_idx, cols, dt, beta, gamma, n);
-
-        // Stockage du noeud d'intérêt
-        uxI[i] = uxi[node_I];
-        uyI[i] = uyi[node_I];
-        vxI[i] = vxi[node_I];
-        vyI[i] = vyi[node_I];
-        t[i] = i * dt;
+    // empile uxi/uyi et vxi/vyi dans q et v
+    double *q = malloc(N * sizeof(double));
+    double *v = malloc(N * sizeof(double));
+    for (int i = 0; i < n_nodes; i++) {
+        q[2*i]   = uxi[i];
+        q[2*i+1] = uyi[i];
+        v[2*i]   = vxi[i];
+        v[2*i+1] = vyi[i];
     }
 
-    free(A_eff);
+    for (int k = 0; k < T; k++) {
+        newmark_iter(N, rows_idx, cols,
+                     Kval, Aeff, Mdiag,
+                     q, v, dt, β, γ);
+
+        // extrait la DOF du nœud_I
+        uxI[k] = q[2*node_I];
+        uyI[k] = q[2*node_I+1];
+        vxI[k] = v[2*node_I];
+        vyI[k] = v[2*node_I+1];
+        t[k]   = k * dt;
+    }
+
+    free(Aeff);
+    free(q);
+    free(v);
 }
 
 
+
+/**
+ * Mise à jour q ← q_{n+1} et v ← v_{n+1} en une seule passe,
+ * pour le système non amorti.
+ */
 void newmark_iter(
-    double *q, // uxi / uyi / vxi / vyi
-    double *M,
-    double *K,
-    double *A_eff, // matrice M + β h^2 K
-    int *rows_idx,
-    int *cols,
+    int N,                    // nombre total de DOF (2·#nœuds)
+    const int *rows_idx,
+    const int *cols,
+    const double *Kval,       // K en CSR
+    const double *Aeff,       // M + βh²K en CSR
+    const double *Mdiag,      // masse diagonale
+    double *q,                // [ux,uy,…], taille N
+    double *v,                // vitesses, taille N
     double h,
     double beta,
-    double gamma,
-    int n
+    double gamma
 ) {
-    double *p = (double *)malloc(n * sizeof(double));
-    double *rhs = (double *)malloc(n * sizeof(double));
-    double *qn1 = (double *)malloc(n * sizeof(double));
-    double *Kq = (double *)malloc(n * sizeof(double));
-    double *tmp = (double *)malloc(n * sizeof(double));
+    double *p    = malloc(N * sizeof(double));
+    double *rhs  = malloc(N * sizeof(double));
+    double *qnp1 = malloc(N * sizeof(double));
+    double *Kq   = malloc(N * sizeof(double));
+    double *tmp  = malloc(N * sizeof(double));
 
-    // p_n = M * q̇_n
-    for (int i = 0; i < n; i++) {
-        p[i] = M[i] * q[i]; // q = q̇ ici
+    // 1) p_n = M·v_n
+    for (int i = 0; i < N; i++) p[i] = Mdiag[i] * v[i];
+
+    // 2) Kq = K·q_n
+    Matvec(N, rows_idx, cols, Kval, q, Kq);
+
+    // 3) construction du second membre
+    //    rhs[i] = (Mdiag[i] - ½h²(1-2β)·Kii) q[i] + h·p[i],
+    //    mais on a Kq[i] = (K·q_n)[i], donc :
+    for (int i = 0; i < N; i++) {
+        rhs[i] = (Mdiag[i]
+                  - 0.5 * h*h * (1.0 - 2.0*beta) * Kq[i] / q[i]
+                 ) * q[i]
+               + h * p[i];
     }
 
-    // K * q_n
-    Matvec(n, rows_idx, cols, K, q, Kq);
+    // 4) résolution Aeff · q_{n+1} = rhs
+    CG(N, rows_idx, cols, Aeff, rhs, qnp1, 1e-10);
 
-    // RHS = (M - h²/2 (1 - 2β) K) * q + h * p
-    for (int i = 0; i < n; i++) {
-        rhs[i] = (M[i] - h * h / 2 * (1 - 2 * beta) * Kq[i]) * q[i] + h * p[i];
-    }
-
-    // Résolution A_eff * q_{n+1} = rhs
-    CG(n, rows_idx, cols, A_eff, rhs, qn1, 1e-10);
-
-    // tmp = (1 - γ) * q + γ * qn1
-    for (int i = 0; i < n; i++) {
-        tmp[i] = (1 - gamma) * q[i] + gamma * qn1[i];
-    }
-
-    Matvec(n, rows_idx, cols, K, tmp, Kq);
-
-    // p_{n+1} = p - h * K * tmp
-    for (int i = 0; i < n; i++) {
+    // 5) p_{n+1} = p_n - h·K·[ (1-γ)q_n + γ q_{n+1} ]
+    for (int i = 0; i < N; i++)
+        tmp[i] = (1.0 - gamma) * q[i] + gamma * qnp1[i];
+    Matvec(N, rows_idx, cols, Kval, tmp, Kq);
+    for (int i = 0; i < N; i++)
         p[i] -= h * Kq[i];
+
+    // 6) mise à jour finale : q ← q_{n+1}, v ← p / Mdiag
+    for (int i = 0; i < N; i++) {
+        q[i] = qnp1[i];
+        v[i] = p[i] / Mdiag[i];
     }
 
-    // q_{n+1} = qn1, q̇_{n+1} = p / M
-    for (int i = 0; i < n; i++) {
-        q[i] = qn1[i];
-        q[i] = p[i] / M[i]; // q est maintenant q̇
-    }
-
-    free(p); free(rhs); free(qn1); free(Kq); free(tmp);
+    free(p); free(rhs); free(qnp1); free(Kq); free(tmp);
 }
