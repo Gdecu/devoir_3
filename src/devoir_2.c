@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "model.h"
 
 // SYM = 1 --> Vous ne stockez que la partie inferieure de la matrice
 // SYM = 0 --> Vous stockez toutes les entrées non nulles de la matrice
@@ -126,10 +127,9 @@ int CG(
 // Récup ux_i uy_i vx_i vy_i de <initial.txt>
 int get_intial_condition(
     const char *filename,
-    double *uxi,
-    double *uyi,
-    double *vxi,
-    double *vyi
+    double *u,
+    double *v,
+    int n
 ) {
     FILE *fp = fopen(filename, "r");
     if (fp == NULL) {
@@ -138,7 +138,7 @@ int get_intial_condition(
     }
 
     int i = 0;
-    while (fscanf(fp, "%lf %lf %lf %lf", &uxi[i], &uyi[i], &vxi[i], &vyi[i]) == 4) {
+    while (fscanf(fp, "%lf %lf %lf %lf", &u[2*i], &u[2*i+1], &v[2*i], &v[2*i+1]) == 4) {
         i++;
     }
 
@@ -150,10 +150,8 @@ int get_intial_condition(
 // Stockage solution dans <final.txt> : le déplacement et la vitesse au temps T, au même format que le fichier <initial.txt>
 void stock_final(int n,
     const char *filename,
-    double *uxi,
-    double *uyi,
-    double *vxi,
-    double *vyi
+    double *u,
+    double *v
 ) {
     FILE *fp = fopen(filename, "w");
     if (fp == NULL) {
@@ -162,7 +160,7 @@ void stock_final(int n,
     }
 
     for (int i = 0; i < n; i++) {
-        fprintf(fp, "%lf %lf %lf %lf\n", uxi[i], uyi[i], vxi[i], vyi[i]);
+        fprintf(fp, "%lf %lf %lf %lf\n", u[2*i], u[2*i+1], v[2*i], v[2*i+1]);
     }
 
     fclose(fp);
@@ -192,24 +190,19 @@ void stock_time(
     fclose(fp);
 }
 
-void build_effective_matrix(
+void build_M_coeffK(
     int n,
-    const int *rows_idx,
-    const int *cols,
-    const double *Kval,
-    const double *M,
+    CSRMatrix *K,
+    CSRMatrix *M,
     double *A_eff,
-    double beta,
-    double h
+    double coeff_K
 ) {
-    double coeff = beta * h * h;
-
     for (int i = 0; i < n; i++) {
-        for (int j = rows_idx[i]; j < rows_idx[i + 1]; j++) {
-            int col = cols[j];
-            A_eff[j] = coeff * Kval[j];
+        for (int j = K->row_ptr[i]; j < K->row_ptr[i + 1]; j++) {
+            int col = M->col_idx[j];
+            A_eff[j] = coeff_K * K->data[j];
             if (i == col) {
-                A_eff[j] += M[i]; 
+                A_eff[j] += M->data[i]; 
             }
         }
     }
@@ -218,49 +211,38 @@ void build_effective_matrix(
 
 
 void newmark(
-    double *uxi, double *uyi,      // initialisations u
-    double *vxi, double *vyi,      // initialisations v
+    double *u, double *v,          // initialisations u et v
     double *uxI, double *uyI,      // sorties du nœud I
     double *vxI, double *vyI,
     double *t,                      // temps
-    double *Kval, double *Mdiag,    // CSR K et vecteur M
+    CSRMatrix *K, CSRMatrix *M,    // CSR K et vecteur M
     double Tfinal, int node_I,
     double dt, int n_nodes
 ) {
     int N    = 2 * n_nodes;                // DOF
     int T    = (int)round(Tfinal / dt);
-    double β = 0.25, γ = 0.5;
+    double beta = 0.25, gamma = 0.5;
 
-    extern int *rows_idx, *cols;           // définis par ta lecture CSR
-    double *Aeff = malloc(rows_idx[N] * sizeof(double));
-    build_effective_matrix(N, rows_idx, cols, Kval, Mdiag, Aeff, β, dt);
-
-    // empile uxi/uyi et vxi/vyi dans q et v
-    double *q = malloc(N * sizeof(double));
-    double *v = malloc(N * sizeof(double));
-    for (int i = 0; i < n_nodes; i++) {
-        q[2*i]   = uxi[i];
-        q[2*i+1] = uyi[i];
-        v[2*i]   = vxi[i];
-        v[2*i+1] = vyi[i];
-    }
+    int *rows_idx = K->row_ptr;       // car M strictement inclu dans K --> nnz K = nnz A
+    int *cols = K->col_idx;        
+    double *Aeff = malloc(K->nnz * sizeof(double));                     // Aeff = ( M + beta h² K )
+    double coeff = beta * dt * dt;
+    build_M_coeffK(N, K, M, Aeff, coeff);
 
     for (int k = 0; k < T; k++) {
-        newmark_iter(N, rows_idx, cols,
-                     Kval, Aeff, Mdiag,
-                     q, v, dt, β, γ);
+        newmark_iter(N,
+                     K, M, Aeff,
+                     u, v, dt, beta, gamma);
 
         // extrait la DOF du nœud_I
-        uxI[k] = q[2*node_I];
-        uyI[k] = q[2*node_I+1];
-        vxI[k] = v[2*node_I];
-        vyI[k] = v[2*node_I+1];
+        uxI[k] = u[2 * node_I];
+        uyI[k] = u[2 * node_I + 1];
+        vxI[k] = v[2 * node_I];
+        vyI[k] = v[node_I + 1];
         t[k]   = k * dt;
     }
 
     free(Aeff);
-    free(q);
-    free(v);
 }
 
 
@@ -271,11 +253,9 @@ void newmark(
  */
 void newmark_iter(
     int N,                    // nombre total de DOF (2·#nœuds)
-    const int *rows_idx,
-    const int *cols,
-    const double *Kval,       // K en CSR
-    const double *Aeff,       // M + βh²K en CSR
-    const double *Mdiag,      // masse diagonale
+    CSRMatrix *K,             // K en CSR
+    CSRMatrix *M,             // M en CSR
+    const double *Aeff,       // M + betah²K en CSR
     double *q,                // [ux,uy,…], taille N
     double *v,                // vitesses, taille N
     double h,
@@ -287,38 +267,35 @@ void newmark_iter(
     double *qnp1 = malloc(N * sizeof(double));
     double *Kq   = malloc(N * sizeof(double));
     double *tmp  = malloc(N * sizeof(double));
+    double *Beff = malloc(K->nnz * sizeof(double));
 
     // 1) p_n = M·v_n
-    for (int i = 0; i < N; i++) p[i] = Mdiag[i] * v[i];
+    Matvec(N, M->row_ptr, M->col_idx, M->data, v, p);
 
     // 2) Kq = K·q_n
-    Matvec(N, rows_idx, cols, Kval, q, Kq);
+    Matvec(N, K->row_ptr, K->col_idx, K->data, q, Kq);
 
     // 3) construction du second membre
-    //    rhs[i] = (Mdiag[i] - ½h²(1-2β)·Kii) q[i] + h·p[i],
-    //    mais on a Kq[i] = (K·q_n)[i], donc :
-    for (int i = 0; i < N; i++) {
-        rhs[i] = (Mdiag[i]
-                  - 0.5 * h*h * (1.0 - 2.0*beta) * Kq[i] / q[i]
-                 ) * q[i]
-               + h * p[i];
-    }
+    //    rhs[i] = (Mdiag[i] - ½h²(1-2beta)·Kii) q[i] + h·p[i],
+
+    double coeff = - 0.5 * h * h * (1.0 - 2.0*beta);
+    build_M_coeffK(N, K, M, Beff, coeff);
+    Matvec(N, K->row_ptr, K->col_idx, Beff, q, rhs);    // rhs = Beff·q = (M - 0.5h²(1-2beta)·K )·q
+    cblas_daxpy(N, h, p, 1, rhs, 1);                    // rhs = rhs + h·p
 
     // 4) résolution Aeff · q_{n+1} = rhs
-    CG(N, rows_idx, cols, Aeff, rhs, qnp1, 1e-10);
+    CG(N, K->row_ptr, K->col_idx, Aeff, rhs, qnp1, 1e-10);
 
-    // 5) p_{n+1} = p_n - h·K·[ (1-γ)q_n + γ q_{n+1} ]
+    // 5) p_{n+1} = p_n - h·K·[ (1-gamma)q_n + gamma q_{n+1} ]
     for (int i = 0; i < N; i++)
         tmp[i] = (1.0 - gamma) * q[i] + gamma * qnp1[i];
-    Matvec(N, rows_idx, cols, Kval, tmp, Kq);
+    Matvec(N, K->col_idx, K->row_ptr, K->data, tmp, Kq);
     for (int i = 0; i < N; i++)
         p[i] -= h * Kq[i];
 
-    // 6) mise à jour finale : q ← q_{n+1}, v ← p / Mdiag
-    for (int i = 0; i < N; i++) {
-        q[i] = qnp1[i];
-        v[i] = p[i] / Mdiag[i];
-    }
+    // 6) mise à jour finale : q ← q_{n+1}, M v ← p 
+    cblas_dcopy(N, qnp1, 1, q, 1); // q = qnp1
+    CG(N, M->row_ptr, M->col_idx, M->data, p, v, 1e-10);
 
-    free(p); free(rhs); free(qnp1); free(Kq); free(tmp);
+    free(p); free(rhs); free(qnp1); free(Kq); free(tmp); free(Beff);
 }

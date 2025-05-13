@@ -103,12 +103,10 @@ int main(int argc, char *argv[]) {
     printf("nnz  = %d\n", nnz);
     printf("n  = %d\n", n);
 
-    // Récup condition initiale --> ds les quels on va stocker les ux_i uy_i vx_i vy_i au temps T
-    double *uxi = (double *)malloc( n * sizeof(double));
-    double *uyi = (double *)malloc( n * sizeof(double));
-    double *vxi = (double *)malloc( n * sizeof(double));
-    double *vyi = (double *)malloc( n * sizeof(double));
-    n = get_intial_condition(argv[5], uxi, uyi, vxi, vyi);
+    // Récup condition initiale --> ds les quels on va stocker les u, v au temps T
+    double *u = (double *)malloc( n * sizeof(double));
+    double *v = (double *)malloc( n * sizeof(double));
+    n = get_intial_condition(argv[5], u, v, n);
     printf("n  = %d\n", n);
 
     int T = atoi(argv[3]); // Temps total
@@ -121,18 +119,19 @@ int main(int argc, char *argv[]) {
     }
 
     // On vas stocker les uxI uyI vxI vyI du nœud I à chaque itération temporelle
-    double *uxI = (double *)malloc( T * sizeof(double));
-    double *uyI = (double *)malloc( T * sizeof(double));
-    double *vxI = (double *)malloc( T * sizeof(double));
-    double *vyI = (double *)malloc( T * sizeof(double));
-    double *t = (double *)malloc( T * sizeof(double));
+    int N = (int) round(T / dt);
+    double *uxI = (double *)malloc( N * sizeof(double));
+    double *uyI = (double *)malloc( N * sizeof(double));
+    double *vxI = (double *)malloc( N * sizeof(double));
+    double *vyI = (double *)malloc( N * sizeof(double));
+    double *t = (double *)malloc( N * sizeof(double));
 
 
     // Newmark computation
     newmark(
-        uxi, uyi, vxi, vyi,
+        u, v,
         uxI, uyI, vxI, vyI, t,
-        Ksp->data, Msp->data,
+        Ksp, Msp,
         T, node_I,
         dt,
         n
@@ -140,7 +139,7 @@ int main(int argc, char *argv[]) {
 
 
     // Stockage solution dans <final.txt> : le déplacement et la vitesse au temps T, au même format que le fichier <initial.txt>
-    stock_final(n, argv[6], uxi, uyi, vxi, vyi);
+    stock_final(n, argv[6], u, v);
     
 
     // Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle
@@ -148,10 +147,8 @@ int main(int argc, char *argv[]) {
 
 
 
-    free(uxi);
-    free(uyi);
-    free(vxi);
-    free(vyi);
+    free(u);
+    free(v);
 
     free(uxI);
     free(uyI);

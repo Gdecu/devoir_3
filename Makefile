@@ -67,3 +67,6 @@ $(PROG): $(OBJS)
 # Nettoyage
 clean:
 	rm -f $(PROG) $(OBJS)
+
+valgrind: $(PROG)
+	@valgrind --leak-check=full --track-origins=yes ./$(PROG)
