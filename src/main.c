@@ -91,8 +91,8 @@ int main(int argc, char *argv[]) {
     CSRMatrix *Ksp = band_to_sym_csr(Kbd);
     CSRMatrix *Msp = band_to_sym_csr(Mbd);
     double eps = 1e-8;
-    CG(Ksp->n, Ksp->row_ptr, Ksp->col_idx, Ksp->data, rhs, sol, eps);    
-    // display_sol(model, sol);
+    //CG(Ksp->n, Ksp->row_ptr, Ksp->col_idx, Ksp->data, rhs, sol, eps);    
+    //display_sol(model, sol);
 
     // Début modif
     // Devoir 3
@@ -114,6 +114,8 @@ int main(int argc, char *argv[]) {
 
     int T = atoi(argv[3]); // Temps total
     double dt = atof(argv[4]); // Pas de temps
+    printf("T  = %d\n", T);
+    printf("dt  = %le\n", dt);
     int node_I = atoi(argv[8]); // Nœud I
 
     if (T <= 0 || dt <= 0) {
@@ -146,7 +148,7 @@ int main(int argc, char *argv[]) {
     
 
     // Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle
-    stock_time(T, argv[7], t, uxI, uyI, vxI, vyI);
+    stock_time(N, argv[7], t, uxI, uyI, vxI, vyI);
 
 
 
