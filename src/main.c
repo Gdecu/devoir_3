@@ -107,7 +107,10 @@ int main(int argc, char *argv[]) {
     double *u = (double *)malloc( n * sizeof(double));
     double *v = (double *)malloc( n * sizeof(double));
     n = get_intial_condition(argv[5], u, v, n);
+    printf("ux[0]  = %15le, uy[0] = %15le\n", u[0], u[1]);
+    printf("vx[0]  = %15le, vy[0] = %15le\n", v[0], v[1]);
     printf("n  = %d\n", n);
+    printf("\n");
 
     int T = atoi(argv[3]); // Temps total
     double dt = atof(argv[4]); // Pas de temps

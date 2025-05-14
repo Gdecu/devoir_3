@@ -131,19 +131,37 @@ int get_intial_condition(
     double *v,
     int n
 ) {
-    FILE *fp = fopen(filename, "r");
-    if (fp == NULL) {
-        printf("Error opening file %s\n", filename);
-        exit(EXIT_FAILURE);
+    n = n / 2;
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Erreur lors de l'ouverture du fichier");
+        return -1;
     }
 
-    int i = 0;
-    while (fscanf(fp, "%lf %lf %lf %lf", &u[2*i], &u[2*i+1], &v[2*i], &v[2*i+1]) == 4) {
-        i++;
+    // Chaque colonne correspond à un point, donc on lit 4 lignes, chacune avec n colonnes.
+    for (int line = 0; line < n; ++line) {
+        for (int col = 0; col < 4; ++col) {
+            double value;
+            if (fscanf(file, "%le", &value) != 1) {
+                fprintf(stderr, "Erreur de lecture à la ligne %d, colonne %d\n", line + 1, col + 1);
+                fclose(file);
+                return -1;
+            }
+
+            if (col == 0) {
+                u[2 * line] = value;         // ux_i
+            } else if (col == 1) {
+                u[2 * line + 1] = value;     // uy_i
+            } else if (col == 2) {
+                v[2 * line] = value;         // vx_i
+            } else if (col == 3) {
+                v[2 * line + 1] = value;     // vy_i
+            }
+        }
     }
 
-    fclose(fp);
-    return i;
+    fclose(file);
+    return n;
 }
 
 
@@ -160,7 +178,7 @@ void stock_final(int n,
     }
 
     for (int i = 0; i < n; i++) {
-        fprintf(fp, "%lf %lf %lf %lf\n", u[2*i], u[2*i+1], v[2*i], v[2*i+1]);
+        fprintf(fp, "%.15le %.15le %.15le %.15le\n", u[2*i], u[2*i+1], v[2*i], v[2*i+1]);
     }
 
     fclose(fp);
@@ -184,12 +202,17 @@ void stock_time(
     }
 
     for (int i = 0; i < T; i++) {
-        fprintf(fp, "%lf %lf %lf %lf %lf\n",t[i], uxi[i], uyi[i], vxi[i], vyi[i]);
+        fprintf(fp, "%.15le %.15le %.15le %.15le %.15le\n",t[i], uxi[i], uyi[i], vxi[i], vyi[i]);
     }
 
     fclose(fp);
 }
 
+
+// Construction de Aeff = M + coéff K
+// K, M : n x n  format csr : K->row_ptr, K->col_idx, K->data
+// Aeff : n x n  format csr : row_ptr, col_idx = ceux de K carles valeurs nn de M sont strictement inclue dans K ; Aeff = data
+// coeff_K : coefficient de K
 void build_M_coeffK(
     int n,
     CSRMatrix *K,
@@ -199,15 +222,55 @@ void build_M_coeffK(
 ) {
     for (int i = 0; i < n; i++) {
         for (int j = K->row_ptr[i]; j < K->row_ptr[i + 1]; j++) {
-            int col = M->col_idx[j];
-            A_eff[j] = coeff_K * K->data[j];
-            if (i == col) {
-                A_eff[j] += M->data[i]; 
+            A_eff[j] = coeff_K * K->data[j];         
+            for (int k = M->row_ptr[i]; k < M->row_ptr[i + 1]; k++) {
+                if (M->col_idx[k] == K->col_idx[j]) {
+                    A_eff[j] += M->data[k];
+                }
             }
         }
     }
 }
 
+// Fonction de test
+void test_build_M_coeffK() {
+    // Exemple simple : matrices 3x3
+    // K = [2 1 0
+    //      1 3 1
+    //      0 1 4]
+    // en CSR :
+    int n = 3;
+    int nnz = 7;
+    int row_ptr[] = {0, 2, 5, 7};
+    int col_idx[] = {0, 1, 0, 1, 2, 1, 2};
+    double K_data[] = {2.0, 1.0, 1.0, 3.0, 1.0, 1.0, 4.0};
+
+    // M = diag([10, 20, 30]) -> stocké uniquement la diagonale
+    double M_data[] = {10.0, 100.0, 20.0, 30.0};
+    int row_ptr_M[] = {0, 2, 3, 4};
+    int col_idx_M[] = {0, 1, 1, 2}; // M stocke seulement la diagonale
+
+    // coeff pour K
+    double coeff_K = 0.5;
+
+    // Résultat attendu :
+    // A_eff = coeff_K * K + M (sur diagonale uniquement)
+    double A_eff_data[] = {11.0, 100.5, 0.5, 21.5, 0.5, 0.5, 32.0};
+
+    double A_eff[7];
+
+    // Structures CSR
+    CSRMatrix K = {n, nnz, row_ptr, col_idx, K_data};
+    CSRMatrix M = {n, n, row_ptr_M, col_idx_M, M_data}; // M stocke seulement la diagonale
+
+    build_M_coeffK(n, &K, &M, A_eff, coeff_K);
+
+    // Affichage du résultat
+    printf("Résultat A_eff (CSR data) :\n");
+    for (int i = 0; i < nnz; i++) {
+        printf("A_eff[%d] = %.2f vs %f\n", i, A_eff[i], A_eff_data[i]);
+    }
+}
 
 
 void newmark(
@@ -223,10 +286,10 @@ void newmark(
     int T    = (int)round(Tfinal / dt);
     double beta = 0.25, gamma = 0.5;
 
-    int *rows_idx = K->row_ptr;       // car M strictement inclu dans K --> nnz K = nnz A
-    int *cols = K->col_idx;        
+    // car M strictement inclu dans K --> nnz K = nnz A        
     double *Aeff = malloc(K->nnz * sizeof(double));                     // Aeff = ( M + beta h² K )
     double coeff = beta * dt * dt;
+    //test_build_M_coeffK();
     build_M_coeffK(N, K, M, Aeff, coeff);
 
     for (int k = 0; k < T; k++) {
@@ -272,11 +335,8 @@ void newmark_iter(
     // 1) p_n = M·v_n
     Matvec(N, M->row_ptr, M->col_idx, M->data, v, p);
 
-    // 2) Kq = K·q_n
-    Matvec(N, K->row_ptr, K->col_idx, K->data, q, Kq);
-
     // 3) construction du second membre
-    //    rhs[i] = (Mdiag[i] - ½h²(1-2beta)·Kii) q[i] + h·p[i],
+    //    rhs = (M - ½h²(1-2beta)·K) q + h·p,
 
     double coeff = - 0.5 * h * h * (1.0 - 2.0*beta);
     build_M_coeffK(N, K, M, Beff, coeff);
@@ -289,7 +349,7 @@ void newmark_iter(
     // 5) p_{n+1} = p_n - h·K·[ (1-gamma)q_n + gamma q_{n+1} ]
     for (int i = 0; i < N; i++)
         tmp[i] = (1.0 - gamma) * q[i] + gamma * qnp1[i];
-    Matvec(N, K->col_idx, K->row_ptr, K->data, tmp, Kq);
+    Matvec(N, K->row_ptr, K->col_idx, K->data, tmp, Kq);
     for (int i = 0; i < N; i++)
         p[i] -= h * Kq[i];
 
@@ -299,3 +359,7 @@ void newmark_iter(
 
     free(p); free(rhs); free(qnp1); free(Kq); free(tmp); free(Beff);
 }
+// analyse theorique : convergence - stabilité
+// analys ingénieur : conservation de l'énergie - animation -- FFT
+// --> faire au moins un de chaque
+// augmenter taille input avec devoir 2
