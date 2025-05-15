@@ -114,8 +114,10 @@ int main(int argc, char *argv[]) {
 
     int T = atoi(argv[3]); // Temps total
     double dt = atof(argv[4]); // Pas de temps
+    int nbr_iter = (int) (T/ dt); // Nombre d'itérations de la méthode de Newmark
     printf("T  = %d\n", T);
     printf("dt  = %le\n", dt);
+    printf("nbr_iter  = %d\n", nbr_iter);
     int node_I = atoi(argv[8]); // Nœud I
 
     if (T <= 0 || dt <= 0) {
@@ -124,12 +126,17 @@ int main(int argc, char *argv[]) {
     }
 
     // On vas stocker les uxI uyI vxI vyI du nœud I à chaque itération temporelle
-    int N = (int) round(T / dt);
-    double *uxI = (double *)malloc( N * sizeof(double));
-    double *uyI = (double *)malloc( N * sizeof(double));
-    double *vxI = (double *)malloc( N * sizeof(double));
-    double *vyI = (double *)malloc( N * sizeof(double));
-    double *t = (double *)malloc( N * sizeof(double));
+    double *uxI = (double *)malloc( (nbr_iter + 1) * sizeof(double));
+    double *uyI = (double *)malloc( (nbr_iter + 1) * sizeof(double));
+    double *vxI = (double *)malloc( (nbr_iter + 1) * sizeof(double));
+    double *vyI = (double *)malloc( (nbr_iter + 1) * sizeof(double));
+    double *t = (double *)malloc( (nbr_iter + 1) * sizeof(double));
+
+    uxI[0] = u[2 * node_I];
+    uyI[0] = u[2 * node_I + 1];
+    vxI[0] = v[2 * node_I];
+    vyI[0] = v[2 * node_I + 1];
+    t[0]   = 0.0;
 
 
     // Newmark computation
@@ -137,7 +144,7 @@ int main(int argc, char *argv[]) {
         u, v,
         uxI, uyI, vxI, vyI, t,
         Ksp, Msp,
-        T, node_I,
+        nbr_iter, node_I,
         dt,
         n
     );
@@ -148,7 +155,7 @@ int main(int argc, char *argv[]) {
     
 
     // Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle
-    stock_time(N, argv[7], t, uxI, uyI, vxI, vyI);
+    stock_time(nbr_iter+1, argv[7], t, uxI, uyI, vxI, vyI);
 
 
 

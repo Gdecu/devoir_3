@@ -187,7 +187,7 @@ void stock_final(int n,
 
 // Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle
 void stock_time(
-    int T,
+    int nbr_iter,
     const char *filename,
     double *t,
     double *uxi,
@@ -201,7 +201,7 @@ void stock_time(
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < T; i++) {
+    for (int i = 0; i < nbr_iter; i++) {
         fprintf(fp, "%.15le %.15le %.15le %.15le %.15le\n",t[i], uxi[i], uyi[i], vxi[i], vyi[i]);
     }
 
@@ -229,6 +229,10 @@ void build_M_coeffK(
                 }
             }
         }
+        /*for (int j = M->row_ptr[i]; j < M->row_ptr[i + 1]; j++) {     // jsp pk avec cette boucle au lieu de la boucle en k ca marche pas ...
+            A_eff[j] += M->data[j];
+            
+        }*/
     }
 }
 
@@ -274,37 +278,80 @@ void test_build_M_coeffK() {
 
 
 void newmark(
-    double *u, double *v,          // initialisations u et v
+    double *u, double *v,          // u et v initiales
     double *uxI, double *uyI,      // sorties du nœud I
     double *vxI, double *vyI,
     double *t,                      // temps
     CSRMatrix *K, CSRMatrix *M,    // CSR K et vecteur M
-    double Tfinal, int node_I,
+    double nbr_iter, int node_I,
     double dt, int n_nodes
 ) {
     int N    = 2 * n_nodes;                // DOF
-    int T    = (int)round(Tfinal / dt);
     double beta = 0.25, gamma = 0.5;
 
-    // car M strictement inclu dans K --> nnz K = nnz A        
-    double *Aeff = malloc(K->nnz * sizeof(double));                     // Aeff = ( M + beta h² K )
-    double coeff = beta * dt * dt;
-    //test_build_M_coeffK();
-    build_M_coeffK(N, K, M, Aeff, coeff);
 
-    for (int k = 0; k < T; k++) {
-        newmark_iter(N,
-                     K, M, Aeff,
-                     u, v, dt, beta, gamma);
+    double *p    = malloc(N * sizeof(double));
+    double *rhs  = malloc(N * sizeof(double));
+    double *q_moy = malloc(N * sizeof(double));
+    double *q_new = malloc(N * sizeof(double));
+    double *Kq   = malloc(N * sizeof(double));
+    double *Aeff = malloc(K->nnz * sizeof(double));            // car M strictement inclu dans K --> nnz K = nnz A
+    double *Beff = malloc(K->nnz * sizeof(double));
+    
+    //test_build_M_coeffK();        // c bon il marche
+
+    double coeff = beta * dt * dt;                          // coeff pour K coeff : beta h²
+    build_M_coeffK(N, K, M, Aeff, coeff);                   // Aeff = ( M + beta h² K )
+    
+    coeff = - 0.5 * dt * dt * (1.0 - 2.0*beta);             // coeff pour K coeff : - 0.5 h² (1-2beta)
+    build_M_coeffK(N, K, M, Beff, coeff);                   // Beff = (M - 0.5 dt² (1-2beta) K )
+    
+    for (int k = 0; k < nbr_iter; k++) {
+
+        //
+        // One iteration of the Newmark method
+        //
+
+        // 1) p_n = M·v_n
+        Matvec(N, M->row_ptr, M->col_idx, M->data, v, p);
+
+        // 2) construction du second membre
+        //    rhs = (M - ½h²(1-2beta)·K) q + h·p,
+
+        Matvec(N, K->row_ptr, K->col_idx, Beff, u, rhs);    // rhs = Beff·q = (M - 0.5h²(1-2beta)·K )·q
+        cblas_daxpy(N, dt, p, 1, rhs, 1);                   // rhs = rhs + h·p
+
+        // 3) résolution Aeff · q_{n+1} = rhs
+        CG(N, K->row_ptr, K->col_idx, Aeff, rhs, q_new, 1e-15);
+
+        // 4) p_{n+1} = p_n - h·K·[ (1-gamma)q_n + gamma q_{n+1} ]
+        for (int i = 0; i < N; i++)
+            q_moy[i] = (1.0 - gamma) * u[i] + gamma * q_new[i];
+
+        Matvec(N, K->row_ptr, K->col_idx, K->data, q_moy, Kq);
+        
+        for (int i = 0; i < N; i++)
+            p[i] -= dt * Kq[i];
+
+        // 5) mise à jour finale : q ← q_{n+1}, M v ← p 
+        cblas_dcopy(N, q_new, 1, u, 1); // q = qnp1
+        CG(N, M->row_ptr, M->col_idx, M->data, p, v, 1e-15);
+
+
+        // 
+        // End of one iteration of the Newmark method
+        //
 
         // extrait la DOF du nœud_I
-        uxI[k] = u[2 * node_I];
-        uyI[k] = u[2 * node_I + 1];
-        vxI[k] = v[2 * node_I];
-        vyI[k] = v[node_I + 1];
-        t[k]   = k * dt;
+        uxI[k+1] = u[2 * node_I];
+        uyI[k+1] = u[2 * node_I + 1];
+        vxI[k+1] = v[2 * node_I];
+        vyI[k+1] = v[2 * node_I + 1];
+        t[k+1]   = (k+1) * dt;
+        //printf("iteration %d\n", k);
     }
 
+    free(p); free(rhs); free(q_new); free(Kq); free(q_moy); free(Beff);
     free(Aeff);
 }
 
@@ -325,39 +372,7 @@ void newmark_iter(
     double beta,
     double gamma
 ) {
-    double *p    = malloc(N * sizeof(double));
-    double *rhs  = malloc(N * sizeof(double));
-    double *qnp1 = malloc(N * sizeof(double));
-    double *Kq   = malloc(N * sizeof(double));
-    double *tmp  = malloc(N * sizeof(double));
-    double *Beff = malloc(K->nnz * sizeof(double));
 
-    // 1) p_n = M·v_n
-    Matvec(N, M->row_ptr, M->col_idx, M->data, v, p);
-
-    // 3) construction du second membre
-    //    rhs = (M - ½h²(1-2beta)·K) q + h·p,
-
-    double coeff = - 0.5 * h * h * (1.0 - 2.0*beta);
-    build_M_coeffK(N, K, M, Beff, coeff);
-    Matvec(N, K->row_ptr, K->col_idx, Beff, q, rhs);    // rhs = Beff·q = (M - 0.5h²(1-2beta)·K )·q
-    cblas_daxpy(N, h, p, 1, rhs, 1);                    // rhs = rhs + h·p
-
-    // 4) résolution Aeff · q_{n+1} = rhs
-    CG(N, K->row_ptr, K->col_idx, Aeff, rhs, qnp1, 1e-10);
-
-    // 5) p_{n+1} = p_n - h·K·[ (1-gamma)q_n + gamma q_{n+1} ]
-    for (int i = 0; i < N; i++)
-        tmp[i] = (1.0 - gamma) * q[i] + gamma * qnp1[i];
-    Matvec(N, K->row_ptr, K->col_idx, K->data, tmp, Kq);
-    for (int i = 0; i < N; i++)
-        p[i] -= h * Kq[i];
-
-    // 6) mise à jour finale : q ← q_{n+1}, M v ← p 
-    cblas_dcopy(N, qnp1, 1, q, 1); // q = qnp1
-    CG(N, M->row_ptr, M->col_idx, M->data, p, v, 1e-10);
-
-    free(p); free(rhs); free(qnp1); free(Kq); free(tmp); free(Beff);
 }
 // analyse theorique : convergence - stabilité
 // analys ingénieur : conservation de l'énergie - animation -- FFT
