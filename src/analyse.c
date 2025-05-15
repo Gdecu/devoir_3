@@ -4,6 +4,10 @@
 #include <stdlib.h>
 #include "model.h"
 #include "analyse.h"
+#include "utils.h"
+#include "utils_gmsh.h"
+#include "gmshc.h"
+#include <math.h>
 
 void newmark_anim(
     double *u, double *v,          // u et v initiales
@@ -22,7 +26,7 @@ void newmark_anim(
     double *Kq   = malloc(N * sizeof(double));
     double *Aeff = malloc(K->nnz * sizeof(double));            // car M strictement inclu dans K --> nnz K = nnz A
     double *Beff = malloc(K->nnz * sizeof(double));
-    
+
     //test_build_M_coeffK();        // c bon il marche
 
     double coeff = beta * dt * dt;                          // coeff pour K coeff : beta h²
@@ -32,6 +36,7 @@ void newmark_anim(
     build_M_coeffK(N, K, M, Beff, coeff);                   // Beff = (M - 0.5 dt² (1-2beta) K )
     
     for (int k = 0; k < nbr_iter; k++) {
+        //printf("iteration %d / %d\n", k+1, nbr_iter);
 
         //
         // One iteration of the Newmark method
@@ -99,6 +104,18 @@ void get_nbrIter_finalSol(char *initial_conditions, CSRMatrix *Ksp, CSRMatrix *M
         nbr_iter, dt , n);
 }
 
-void display_anim(){
 
+void get_coords(double *coord, int n_nodes, char *filename) {
+
+    FILE *coord_file = fopen(filename, "w");
+    if (!coord_file) {
+        perror("Failed to open coords.txt");
+        return -1;
+    }
+
+    for (int i = 0; i < n_nodes; i++) {
+        fprintf(coord_file, "%.15le, %.15le\n", coord[2 * i], coord[2 * i + 1]);
+    }
+
+    fclose(coord_file);
 }

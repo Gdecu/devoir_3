@@ -4,6 +4,9 @@
         "stdio.h": "c",
         "utils_gmsh.h": "c",
         "math.h": "c",
-        "gmshc.h": "c"
+        "gmshc.h": "c",
+        "devoir_2.h": "c",
+        "analyse.h": "c",
+        "model.h": "c"
     }
 }

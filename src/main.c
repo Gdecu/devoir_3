@@ -86,7 +86,13 @@ int main(int argc, char *argv[]) {
     double *sol = (double *)calloc(2 * model->n_node, sizeof(double));
     add_bulk_source(model, rhs);
     enforce_bd_conditions(model, rhs);
-    
+
+
+
+    // Récup les coords du modèle
+    char *filename = "./data/coords.txt";
+    get_coords(model->coords, model->n_node, filename);
+
     SymBandMatrix *Kbd = model->K;
     SymBandMatrix *Mbd = model->M;
     CSRMatrix *Ksp = band_to_sym_csr(Kbd);
@@ -141,6 +147,7 @@ int main(int argc, char *argv[]) {
 
 
     // Newmark computation
+    printf("Début de la méthode de Newmark\n\n");
     newmark(
         u, v,
         uxI, uyI, vxI, vyI, t,
@@ -152,24 +159,22 @@ int main(int argc, char *argv[]) {
 
 
     // Stockage solution dans <final.txt> : le déplacement et la vitesse au temps T, au même format que le fichier <initial.txt>
+    printf("Stockage solution dans <final.txt> : le déplacement et la vitesse au temps T, au même format que le fichier <initial.txt>\n\n");
     stock_final(n, argv[6], u, v);
     
 
     // Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle
+    printf("Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle\n\n");
     stock_time(nbr_iter+1, argv[7], t, uxI, uyI, vxI, vyI);
 
     // Display the solution
-    printf("Displaying the solution...\n");
+    //printf("Displaying the solution...\n\n");
     //display_sol(model, sol);
     
     // Animation
-    printf("\nStarting animation...\n\n");
-
-
-
+    printf("\nRécupreration de %d etats final pour la simulation\n\n", nbr_iter);
     get_nbrIter_finalSol(argv[5], Ksp, Msp, u, v, n, T, dt, nbr_iter);
 
-    //display_anim();
 
 
     free(u);

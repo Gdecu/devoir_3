@@ -3,8 +3,11 @@
 
 #include "model.h"
 
+#define MAXNAME 256
+#define FALSE 0 
+#define TRUE  1
+
 // Stuff for animation
 void get_nbrIter_finalSol(char *initial_conditions, CSRMatrix *Ksp, CSRMatrix *Msp, double *u, double *v, int n, int T, double dt, int nbr_iter);
-void display_anim();
-
+void get_coords(double *coord, int n_nodes, char *filename);
 #endif
