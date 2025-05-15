@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "model.h"
 #include "utils_gmsh.h"
+#include "analyse.h"
 #include "gmshc.h"
 #include "../gmsh-sdk/include/gmshc.h"
 #include <math.h>
@@ -101,14 +102,14 @@ int main(int argc, char *argv[]) {
     int nnz = Ksp->nnz;
     int n = Ksp->n;
     printf("nnz  = %d\n", nnz);
-    printf("n  = %d\n", n);
+    printf("n  = %d\n\n", n);
 
     // Récup condition initiale --> ds les quels on va stocker les u, v au temps T
     double *u = (double *)malloc( n * sizeof(double));
     double *v = (double *)malloc( n * sizeof(double));
     n = get_intial_condition(argv[5], u, v, n);
-    printf("ux[0]  = %15le, uy[0] = %15le\n", u[0], u[1]);
-    printf("vx[0]  = %15le, vy[0] = %15le\n", v[0], v[1]);
+    //printf("ux[0]  = %15le, uy[0] = %15le\n", u[0], u[1]);
+    //printf("vx[0]  = %15le, vy[0] = %15le\n", v[0], v[1]);
     printf("n  = %d\n", n);
     printf("\n");
 
@@ -117,7 +118,7 @@ int main(int argc, char *argv[]) {
     int nbr_iter = (int) (T/ dt); // Nombre d'itérations de la méthode de Newmark
     printf("T  = %d\n", T);
     printf("dt  = %le\n", dt);
-    printf("nbr_iter  = %d\n", nbr_iter);
+    printf("nbr_iter  = %d\n\n", nbr_iter);
     int node_I = atoi(argv[8]); // Nœud I
 
     if (T <= 0 || dt <= 0) {
@@ -157,6 +158,18 @@ int main(int argc, char *argv[]) {
     // Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle
     stock_time(nbr_iter+1, argv[7], t, uxI, uyI, vxI, vyI);
 
+    // Display the solution
+    printf("Displaying the solution...\n");
+    //display_sol(model, sol);
+    
+    // Animation
+    printf("\nStarting animation...\n\n");
+
+
+
+    get_nbrIter_finalSol(argv[5], Ksp, Msp, u, v, n, T, dt, nbr_iter);
+
+    //display_anim();
 
 
     free(u);
@@ -168,6 +181,8 @@ int main(int argc, char *argv[]) {
     free(vyI);
     free(t);
     // fin modif
+
+
     
     // Free stuff
     free_csr(Ksp);

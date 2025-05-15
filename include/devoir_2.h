@@ -38,15 +38,4 @@ void newmark(
     double dt, int n_nodes
 );
 
-void newmark_iter(
-    int N,                    // nombre total de DOF (2·#nœuds)
-    CSRMatrix *K,             // K en CSR
-    CSRMatrix *M,             // M en CSR
-    const double *Aeff,       // M + betah²K en CSR
-    double *q,                // [ux,uy,…], taille N
-    double *v,                // vitesses, taille N
-    double h,
-    double beta,
-    double gamma
-);
 #endif

@@ -357,23 +357,6 @@ void newmark(
 
 
 
-/**
- * Mise à jour q ← q_{n+1} et v ← v_{n+1} en une seule passe,
- * pour le système non amorti.
- */
-void newmark_iter(
-    int N,                    // nombre total de DOF (2·#nœuds)
-    CSRMatrix *K,             // K en CSR
-    CSRMatrix *M,             // M en CSR
-    const double *Aeff,       // M + betah²K en CSR
-    double *q,                // [ux,uy,…], taille N
-    double *v,                // vitesses, taille N
-    double h,
-    double beta,
-    double gamma
-) {
-
-}
 // analyse theorique : convergence - stabilité
 // analys ingénieur : conservation de l'énergie - animation -- FFT
 // --> faire au moins un de chaque

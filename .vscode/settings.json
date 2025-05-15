@@ -3,6 +3,7 @@
         "cblas.h": "c",
         "stdio.h": "c",
         "utils_gmsh.h": "c",
-        "math.h": "c"
+        "math.h": "c",
+        "gmshc.h": "c"
     }
 }
