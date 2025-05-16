@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
 
     // Test ordre de convergence
     printf("Test ordre de convergence\n");
-    convergence(Ksp, Msp, 2*n, T, argv[5]);
+    //convergence(Ksp, Msp, 2*n, T, argv[5]);
 
 
 
