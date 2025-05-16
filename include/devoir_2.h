@@ -37,5 +37,17 @@ void newmark(
     double Tfinal, int node_I,
     double dt, int n_nodes
 );
+void cblas_daxpy(int n, double alpha, const double *x, int incx, double *y, int incy);
+double cblas_ddot(int n, const double *x, int incx, const double *y, int incy);
+double cblas_dnrm2(int n, const double *x, int incx);
+void cblas_dscal(int n, double alpha, double *x, int incx);
+void cblas_dcopy(int n, const double *x, int incx, double *y, int incy);
+void build_M_coeffK(
+    int n,
+    CSRMatrix *K,
+    CSRMatrix *M,
+    double *A_eff,
+    double coeff_K
+);
 
 #endif
