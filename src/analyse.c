@@ -9,7 +9,7 @@
 #include "gmshc.h"
 #include <math.h>
 
-void newmark_anim(
+void newmark_analyse(
     double *u, double *v,          // u et v initiales
     char *intit_cond,
     CSRMatrix *K, CSRMatrix *M,    // CSR K et vecteur M
@@ -34,7 +34,18 @@ void newmark_anim(
     
     coeff = - 0.5 * dt * dt * (1.0 - 2.0*beta);             // coeff pour K coeff : - 0.5 h² (1-2beta)
     build_M_coeffK(N, K, M, Beff, coeff);                   // Beff = (M - 0.5 dt² (1-2beta) K )
-    
+
+    double *Ax = malloc(N * sizeof(double));
+
+
+    FILE *energy_file = fopen("./data/enrgy.txt", "w");
+    if (!energy_file) {
+        perror("Failed to open energy.txt");
+        return -1;
+    }
+
+    double kinetic, potential, total;
+
     for (int k = 0; k < nbr_iter; k++) {
         //printf("iteration %d / %d\n", k+1, nbr_iter);
 
@@ -72,17 +83,40 @@ void newmark_anim(
         // End of one iteration of the Newmark method
         //
 
+        // Calcul de l'énergie cinétique et potentielle - et stockage dans <energy.txt>
+        kinetic, potential, total = 0.0;
+
+        // Ekin = 1/2 v^T M v
+        Matvec(N, M->row_ptr, M->col_idx, M->data, v, Ax);
+        kinetic = 0.5 * cblas_ddot(N, v, 1, Ax, 1);
+
+        // Epot = 1/2 u^T K u
+        Matvec(N, K->row_ptr, K->col_idx, K->data, u, Ax);
+        potential = 0.5 * cblas_ddot(N, u, 1, Ax, 1);
+
+        // Etot = Ekin + Epot
+        total = kinetic + potential;
+        //printf("u[0], u[1] = %le, %le\n", u[0], u[1]);
+        //printf("v[0], v[1] = %le, %le\n", v[0], v[1]);
+        //printf("M[0], M[1] = %le, %le\n", M->data[0], M->data[1]);
+        //printf("K[0], K[1] = %le, %le\n", K->data[0], K->data[1]);
+        fprintf(energy_file, "%.15le %.15le %.15le\n", kinetic, potential, total);
+        printf("Ekin = %.15le, Epot = %.15le, Etot = %.15le\n", kinetic, potential, total);
+
         // Stockage solution dans <final.txt> : le déplacement et la vitesse au temps T, au même format que le fichier <initial.txt>
         char filename[40];
         sprintf(filename, "./data/anim/final_%d.txt", k+1);
         stock_final(n_nodes, filename, u, v);
     }
 
+    fclose(energy_file);
+    free(Ax);
+
     free(p); free(rhs); free(q_new); free(Kq); free(q_moy); free(Beff);
     free(Aeff);
 }
 
-void get_nbrIter_finalSol(char *initial_conditions, CSRMatrix *Ksp, CSRMatrix *Msp, double *u, double *v, int n, int T, double dt, int nbr_iter) {
+void analyse(char *initial_conditions, CSRMatrix *Ksp, CSRMatrix *Msp, double *u, double *v, int n, int T, double dt, int nbr_iter) {
 
     // On stocke l'état intiale
     get_intial_condition(initial_conditions, u, v, 2*n);
@@ -98,7 +132,7 @@ void get_nbrIter_finalSol(char *initial_conditions, CSRMatrix *Ksp, CSRMatrix *M
     printf("dt  = %le\n", dt);
     printf("nbr_iter  = %d\n\n", nbr_iter);
 
-    newmark_anim(u, v,
+    newmark_analyse(u, v,
         initial_conditions,
         Ksp, Msp, 
         nbr_iter, dt , n);
@@ -118,4 +152,43 @@ void get_coords(double *coord, int n_nodes, char *filename) {
     }
 
     fclose(coord_file);
+}
+
+
+void convergence(CSRMatrix *Ksp, CSRMatrix *Msp, int n, double T, char *init){
+
+
+
+    double dt_range[9] = {0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0};
+    double dt;
+    for (int i = 0; i < 9; i++) {
+
+        // Récup condition initiale --> ds les quels on va stocker les u, v au temps T
+        double *u = (double *)malloc( n * sizeof(double));
+        double *v = (double *)malloc( n * sizeof(double));
+        n = get_intial_condition(init, u, v, n);
+
+        dt = dt_range[i];
+        int node_I = 1; // Nœud I
+        int nbr_iter = (int) (T/ dt); // Nombre d'itérations de la méthode de Newmark
+        printf("dt  = %le\n", dt);
+        printf("nbr_iter  = %d\n\n", nbr_iter);
+        // On vas stocker les uxI uyI vxI vyI du nœud I à chaque itération temporelle
+        double *t = (double *)malloc( (nbr_iter + 1) * sizeof(double));
+        newmark(
+            u, v,
+            t, t, t, t, t,
+            Ksp, Msp,
+            nbr_iter, node_I,
+            dt,
+            n
+        );
+
+        char filename[40];
+        sprintf(filename, "./data/dt/final_dt%d.txt", i);
+        stock_final(n, filename, u, v);
+        free(t);
+        free(u);
+        free(v);
+    } 
 }

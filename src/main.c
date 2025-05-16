@@ -159,21 +159,32 @@ int main(int argc, char *argv[]) {
 
 
     // Stockage solution dans <final.txt> : le déplacement et la vitesse au temps T, au même format que le fichier <initial.txt>
-    printf("Stockage solution dans <final.txt> : le déplacement et la vitesse au temps T, au même format que le fichier <initial.txt>\n\n");
+    printf("Stockage solution dans <final.txt> : le déplacement et la vitesse au temps T, au même format que le fichier <initial.txt>\n");
     stock_final(n, argv[6], u, v);
-    
+
 
     // Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle
-    printf("Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle\n\n");
+    printf("Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle\n");
     stock_time(nbr_iter+1, argv[7], t, uxI, uyI, vxI, vyI);
 
     // Display the solution
     //printf("Displaying the solution...\n\n");
     //display_sol(model, sol);
-    
+
+    //
+    // Analyses
+    //
+
+    // Verification que l'énergie cinétique et potentielle sont conservées
+    printf("Verification que l'énergie cinétique et potentielle sont conservées\n");
     // Animation
     printf("\nRécupreration de %d etats final pour la simulation\n\n", nbr_iter);
-    get_nbrIter_finalSol(argv[5], Ksp, Msp, u, v, n, T, dt, nbr_iter);
+    analyse(argv[5], Ksp, Msp, u, v, n, T, dt, nbr_iter);
+
+    // Test ordre de convergence
+    printf("Test ordre de convergence\n");
+    //convergence(Ksp, Msp, 2*n, T, argv[5]);
+
 
 
 
