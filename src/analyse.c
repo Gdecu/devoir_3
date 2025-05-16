@@ -41,7 +41,6 @@ void newmark_analyse(
     FILE *energy_file = fopen("./data/enrgy.txt", "w");
     if (!energy_file) {
         perror("Failed to open energy.txt");
-        return -1;
     }
 
     double kinetic, potential, total;
@@ -144,7 +143,6 @@ void get_coords(double *coord, int n_nodes, char *filename) {
     FILE *coord_file = fopen(filename, "w");
     if (!coord_file) {
         perror("Failed to open coords.txt");
-        return -1;
     }
 
     for (int i = 0; i < n_nodes; i++) {
