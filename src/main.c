@@ -104,6 +104,7 @@ int main(int argc, char *argv[]) {
     // Début modif
     // Devoir 3
 
+    printf("Début de la méthode de Newmark\n\n");
     // Récup ux_i uy_i vx_i vy_i de <initial.txt>
     int nnz = Ksp->nnz;
     int n = Ksp->n;
@@ -113,6 +114,7 @@ int main(int argc, char *argv[]) {
     // Récup condition initiale --> ds les quels on va stocker les u, v au temps T
     double *u = (double *)malloc( n * sizeof(double));
     double *v = (double *)malloc( n * sizeof(double));
+    printf("Recup condition initiale\n\n");
     n = get_intial_condition(argv[5], u, v, n);
     //printf("ux[0]  = %15le, uy[0] = %15le\n", u[0], u[1]);
     //printf("vx[0]  = %15le, vy[0] = %15le\n", v[0], v[1]);
@@ -147,7 +149,7 @@ int main(int argc, char *argv[]) {
 
 
     // Newmark computation
-    printf("Début de la méthode de Newmark\n\n");
+    printf("Début de la méthode de Newmark...\n");
     newmark(
         u, v,
         uxI, uyI, vxI, vyI, t,
@@ -156,6 +158,7 @@ int main(int argc, char *argv[]) {
         dt,
         n
     );
+    printf("Fin de la méthode de Newmark\n\n");
 
 
     // Stockage solution dans <final.txt> : le déplacement et la vitesse au temps T, au même format que le fichier <initial.txt>
@@ -166,6 +169,8 @@ int main(int argc, char *argv[]) {
     // Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle
     printf("Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle\n");
     stock_time(nbr_iter+1, argv[7], t, uxI, uyI, vxI, vyI);
+
+    printf("\n\n");
 
     // Display the solution
     //printf("Displaying the solution...\n\n");
@@ -178,12 +183,13 @@ int main(int argc, char *argv[]) {
     // Verification que l'énergie cinétique et potentielle sont conservées
     printf("Verification que l'énergie cinétique et potentielle sont conservées\n");
     // Animation
-    printf("\nRécupreration de %d etats final pour la simulation\n\n", nbr_iter);
+    printf("Récupreration de %d etats final pour la simulation\n\n", nbr_iter);
     analyse(argv[5], Ksp, Msp, u, v, n, T, dt, nbr_iter);
+    printf("\n\n");
 
     // Test ordre de convergence
     printf("Test ordre de convergence\n");
-    //convergence(Ksp, Msp, 2*n, T, argv[5]);
+    convergence(Ksp, Msp, 2*n, T, argv[5]);
 
 
 

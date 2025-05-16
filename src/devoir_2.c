@@ -299,13 +299,10 @@ void newmark(
     double *Beff = malloc(K->nnz * sizeof(double));
     
     //test_build_M_coeffK();        // c bon il marche
-
     double coeff = beta * dt * dt;                          // coeff pour K coeff : beta h²
     build_M_coeffK(N, K, M, Aeff, coeff);                   // Aeff = ( M + beta h² K )
-
     coeff = - 0.5 * dt * dt * (1.0 - 2.0*beta);             // coeff pour K coeff : - 0.5 h² (1-2beta)
     build_M_coeffK(N, K, M, Beff, coeff);                   // Beff = (M - 0.5 dt² (1-2beta) K )
-
     for (int k = 0; k < nbr_iter; k++) {
 
         //

@@ -84,22 +84,24 @@ void newmark_analyse(
         //
 
         // Calcul de l'énergie cinétique et potentielle - et stockage dans <energy.txt>
-        kinetic, potential, total = 0.0;
+        kinetic = 0.0; potential = 0.0; total = 0.0;
 
         // Ekin = 1/2 v^T M v
+        //printf("v[0], v[1] = %le, %le\n", v[0], v[1]);
+        //printf("M[0], M[1] = %le, %le\n", M->data[0], M->data[1]);
         Matvec(N, M->row_ptr, M->col_idx, M->data, v, Ax);
+        //printf("Ax[0 et 1] = %le, %le\n", Ax[0], Ax[1]);
         kinetic = 0.5 * cblas_ddot(N, v, 1, Ax, 1);
 
         // Epot = 1/2 u^T K u
+        //printf("u[0], u[1] = %le, %le\n", u[0], u[1]);
+        //printf("K[0], K[1] = %le, %le\n", K->data[0], K->data[1]);
         Matvec(N, K->row_ptr, K->col_idx, K->data, u, Ax);
+        //printf("Ax[0 et 1] = %le, %le\n", Ax[0], Ax[1]);
         potential = 0.5 * cblas_ddot(N, u, 1, Ax, 1);
 
         // Etot = Ekin + Epot
         total = kinetic + potential;
-        //printf("u[0], u[1] = %le, %le\n", u[0], u[1]);
-        //printf("v[0], v[1] = %le, %le\n", v[0], v[1]);
-        //printf("M[0], M[1] = %le, %le\n", M->data[0], M->data[1]);
-        //printf("K[0], K[1] = %le, %le\n", K->data[0], K->data[1]);
         fprintf(energy_file, "%.15le %.15le %.15le\n", kinetic, potential, total);
         printf("Ekin = %.15le, Epot = %.15le, Etot = %.15le\n", kinetic, potential, total);
 
@@ -124,10 +126,8 @@ void analyse(char *initial_conditions, CSRMatrix *Ksp, CSRMatrix *Msp, double *u
     //printf("vx[0]  = %15le, vy[0] = %15le\n", v[0], v[1]);
     stock_final(n, "./data/anim/final_0.txt", u, v);
 
-    int nnz = Ksp->nnz;
-    printf("K->nnz  = %d\n", nnz);
-    printf("n  = %d\n\n", n);
 
+    printf("n  = %d\n", n);
     printf("T  = %d\n", T);
     printf("dt  = %le\n", dt);
     printf("nbr_iter  = %d\n\n", nbr_iter);
@@ -155,40 +155,94 @@ void get_coords(double *coord, int n_nodes, char *filename) {
 }
 
 
-void convergence(CSRMatrix *Ksp, CSRMatrix *Msp, int n, double T, char *init){
+
+void convergence(CSRMatrix *Ksp, CSRMatrix *Msp, int N, double T, char *init){
+
+    int Ndt = 17;
+    double dt_range[17] = {0.0001, 0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0, 50.0, 100.0};
+    T = 200;
+    double dt = dt_range[0];
+    int n_m;
+    double *u = (double *)malloc( N * sizeof(double));
+    double *v = (double *)malloc( N * sizeof(double));
+    double *t = (double *)malloc( (((int) T / dt ) + 1) * sizeof(double));
+    printf("T = %f\ndt_min = %f, dt_max = %f; Ndt = %d\n\n", T, dt_range[0], dt_range[Ndt-1], Ndt);
 
 
-
-    double dt_range[9] = {0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0};
-    double dt;
-    for (int i = 0; i < 9; i++) {
+    for (int i = 0; i < Ndt; i++) {
 
         // Récup condition initiale --> ds les quels on va stocker les u, v au temps T
-        double *u = (double *)malloc( n * sizeof(double));
-        double *v = (double *)malloc( n * sizeof(double));
-        n = get_intial_condition(init, u, v, n);
+
+        n_m = get_intial_condition(init, u, v, N);
 
         dt = dt_range[i];
         int node_I = 1; // Nœud I
         int nbr_iter = (int) (T/ dt); // Nombre d'itérations de la méthode de Newmark
-        printf("dt  = %le\n", dt);
-        printf("nbr_iter  = %d\n\n", nbr_iter);
+
         // On vas stocker les uxI uyI vxI vyI du nœud I à chaque itération temporelle
-        double *t = (double *)malloc( (nbr_iter + 1) * sizeof(double));
         newmark(
             u, v,
-            t, t, t, t, t,
+            t,t,t,t, t,
             Ksp, Msp,
             nbr_iter, node_I,
             dt,
-            n
+            n_m
         );
 
-        char filename[40];
-        sprintf(filename, "./data/dt/final_dt%d.txt", i);
-        stock_final(n, filename, u, v);
+        char filename[64];
+        snprintf(filename, sizeof filename, "./data/dt/final_dt%.5g.txt", dt);
+        printf("✓ dt = %.5g  -> %s (%d itérations)\n", dt, filename, nbr_iter);
+        stock_final(n_m, filename, u, v);
+    } 
         free(t);
         free(u);
         free(v);
-    } 
 }
+
+
+
+/*
+void convergence(const CSRMatrix *Ksp,
+                 const CSRMatrix *Msp,
+                 int n_dof,
+                 double Tfin,
+                 const char *init_file)
+{
+    const double dt_range[] = {0.01,0.02,0.025,0.05,0.1,0.2,0.25,0.5,1.0};
+    const int    Ndt        = sizeof(dt_range)/sizeof(dt_range[0]);
+
+    double *u0 = malloc(n_dof * sizeof(double));
+    double *v0 = malloc(n_dof * sizeof(double));
+
+    for (int k = 0; k < Ndt; ++k) {
+        double dt = dt_range[k];
+        int    n_iter = (int)ceil(Tfin / dt);    
+        size_t n_pts  = (size_t)n_iter + 1;
+
+        double *t  = malloc((n_iter + 1) * sizeof(double) );               
+
+        int n_ic = get_intial_condition(init_file, u0, v0, n_dof);
+        if (n_ic*2 != n_dof) {
+            fprintf(stderr, "⚠️  %s : %d ddl lus, %d attendus\n",
+                    init_file, n_ic, n_dof);
+        }
+
+        newmark(u0, v0,
+                t, t, t, t, t,   
+                Ksp, Msp,
+                n_iter,  1,
+                dt,
+                n_dof);
+
+        char fname[64];
+        snprintf(fname, sizeof fname, "./data/dt/final_dt%.5g.txt", dt);
+        stock_final(n_dof, fname, u0, v0);
+
+        printf("✓ dt = %.5g  -> %s (%d itérations)\n", dt, fname, n_iter);
+        free(t);
+
+    }
+
+    free(u0); free(v0);
+}
+*/
