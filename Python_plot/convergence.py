@@ -29,7 +29,7 @@ errors = np.zeros(n_h-1)
 for i in range(1, n_h):
     errors_u[i-1] = np.linalg.norm(datas[i][:,:2] - data_ref[:,:2]) / np.linalg.norm(data_ref[:,:2]) # Erreur relative sur le déplacement
     errors_v[i-1] = np.linalg.norm(datas[i][:,2:] - data_ref[:,2:]) / np.linalg.norm(data_ref[:,2:]) # Erreur relative sur la vitesse
-    errors[i-1] = np.linalg.norm(datas[i] - data_ref) # Erreur absolue
+    errors[i-1] = np.linalg.norm(datas[i] - data_ref) / np.linalg.norm(data_ref) # Erreur absolue
     #print(f'Erreur pour dt={dt_range[i]}: {errors[i-1]}')
 
 
