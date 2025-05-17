@@ -7,7 +7,7 @@
 #include "utils.h"
 #include "utils_gmsh.h"
 #include "gmshc.h"
-#include <math.h>
+#include <time.h>
 
 void newmark_analyse(
     double *u, double *v,          // u et v initiales
@@ -154,10 +154,16 @@ void get_coords(double *coord, int n_nodes, char *filename) {
 
 
 
-void convergence(CSRMatrix *Ksp, CSRMatrix *Msp, int N, double T, char *init){
+void convergence_complexity(CSRMatrix *Ksp, CSRMatrix *Msp, int N, double T, char *init){
 
-    int Ndt = 17;
-    double dt_range[17] = {0.0001, 0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0, 50.0, 100.0};
+    //int Ndt = 17;
+    //double dt_range[17] = {0.0001, 0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0, 50.0, 100.0};
+    //int Ndt = 6;
+    //double dt_range[6] = {0.001, 0.002, 0.0025, 0.005, 0.0075, 0.015};
+    int Ndt = 23; Ndt = 22; Ndt -= 8;
+    double dt_range[23] = {/*0.0001, 0.001, 0.002, 0.0025, 0.005, 0.0075, 0.01, 0.015,
+                            0.02,*/ 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0,
+                            2.0, 5.0, 10.0, 15.0, 20.0, 50.0, 100.0};
     T = 200;
     double dt = dt_range[0];
     int n_m;
@@ -166,35 +172,54 @@ void convergence(CSRMatrix *Ksp, CSRMatrix *Msp, int N, double T, char *init){
     double *t = (double *)malloc( (((int) T / dt ) + 1) * sizeof(double));
     printf("T = %f\ndt_min = %f, dt_max = %f; Ndt = %d\n\n", T, dt_range[0], dt_range[Ndt-1], Ndt);
 
+    // Creation du fichier de stockage de la complexité
+    FILE *complexity_file = fopen("./data/complexity.txt", "w");
+    if (!complexity_file) {
+        perror("Failed to open complexity.txt");
+    }
+
+    n_m = get_intial_condition(init, u, v, N);
+    int node_I = 1; // Nœud I
+
 
     for (int i = 0; i < Ndt; i++) {
 
         // Récup condition initiale --> ds les quels on va stocker les u, v au temps T
 
-        n_m = get_intial_condition(init, u, v, N);
 
         dt = dt_range[i];
-        int node_I = 1; // Nœud I
         int nbr_iter = (int) (T/ dt); // Nombre d'itérations de la méthode de Newmark
 
-        // On vas stocker les uxI uyI vxI vyI du nœud I à chaque itération temporelle
-        newmark(
-            u, v,
-            t,t,t,t, t,
-            Ksp, Msp,
-            nbr_iter, node_I,
-            dt,
-            n_m
-        );
+        int pres = 5;                  // On effectue 10 fois la méthode de Newmark pour chaque dt pour plus de précision
+        double elapsed = 0.0;
+
+        for (int j = 0; j < pres; j++){
+            clock_t start = clock();
+            newmark(
+                u, v,
+                t,t,t,t,t,
+                Ksp, Msp,
+                nbr_iter, node_I,
+                dt,
+                n_m
+            );
+            clock_t end = clock(); // Fin chrono
+            elapsed += ((double)(end - start) / CLOCKS_PER_SEC) / pres;
+        }
+
+
+        printf("Itération %d : temps de calcul = %.8f secondes\n", i+1, elapsed);
+        fprintf(complexity_file, "%f %.8f\n", dt, elapsed);
 
         char filename[64];
         snprintf(filename, sizeof filename, "./data/dt/final_dt%.5g.txt", dt);
         printf("✓ dt = %.5g  -> %s (%d itérations)\n", dt, filename, nbr_iter);
         stock_final(n_m, filename, u, v);
     } 
-        free(t);
-        free(u);
-        free(v);
+    fclose(complexity_file);
+    free(t);
+    free(u);
+    free(v);
 }
 
 

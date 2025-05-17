@@ -189,7 +189,9 @@ int main(int argc, char *argv[]) {
 
     // Test ordre de convergence
     printf("Test ordre de convergence\n");
-    //convergence(Ksp, Msp, 2*n, T, argv[5]);
+    // Test complexité temporelle
+    printf("Test complexité temporelle\n");
+    convergence_complexity(Ksp, Msp, 2*n, T, argv[5]);
 
 
 
