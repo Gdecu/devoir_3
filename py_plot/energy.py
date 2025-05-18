@@ -54,7 +54,7 @@ def main(fname: Path):
     plt.legend()
     plt.grid(True, linestyle="--", linewidth=0.5)
     plt.tight_layout()
-    plt.savefig("energy.png", dpi=300)
+    plt.savefig("./images/energy.png", dpi=300)
     #plt.show()
 
 

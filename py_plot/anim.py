@@ -45,4 +45,4 @@ def update(frame):
 ani = animation.FuncAnimation(fig, update, frames=n_frames, interval=50, blit=True)
 
 # === Sauvegarde en GIF ===
-ani.save("animation.gif", writer='pillow')
+ani.save("./images/animation.gif", writer='pillow')

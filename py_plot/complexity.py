@@ -7,7 +7,8 @@ from scipy.stats import linregress
 # On va tracer le temps d'exécution en fonction de dt
 
 # Charger les données de complexité
-complexity_data = np.loadtxt('./data/complexity.txt')
+fileloc = './data/complexity.txt'
+complexity_data = np.loadtxt(fileloc)
 T = 200
 dt_vals = complexity_data[:, 0] 
 times = complexity_data[:, 1]
@@ -15,12 +16,12 @@ times = complexity_data[:, 1]
 N = T / dt_vals 
 
 # Régression linéaire
-slope, intercept, r_value, p_value, std_err = linregress(N, times)
-p = np.log10(slope)
-p = 0.8
+slope, intercept, r_value, p_value, std_err = linregress(np.log10(N), np.log10(times))
+p = slope
 print(f"Ordre estimé de convergence : {p:.3f}")
-C = -2
-regr = 10**C *( N )**(p)
+C = intercept
+print(f"Constante de proportionnalité : {C:.3f}")
+regr = (10**C) *( N )**(p)
 
 plt.figure()
 plt.loglog(N, times, 'o-', label='Temps de calcul', markersize=4)
@@ -30,4 +31,4 @@ plt.ylabel('Temps de calcul log(s)')
 plt.title('Complexité temporelle en fonction de dt')
 plt.grid(True, which='both', linestyle='--', alpha=0.6)
 plt.legend()
-plt.savefig('complexity.png')
+plt.savefig('./images/complexity.png')

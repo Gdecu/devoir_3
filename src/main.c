@@ -191,22 +191,33 @@ int main(int argc, char *argv[]) {
     printf("Verification que l'énergie cinétique et potentielle sont conservées\n");
     // Animation
     printf("Récupreration de %d etats final pour la simulation\n\n", nbr_iter);
-    anim_enrgy(argv[5], Ksp, Msp, u, v, n, T, dt, nbr_iter);
+    T = 100;
+    //anim_enrgy(argv[5], Ksp, Msp, u, v, n, T, dt, nbr_iter);
     printf("\n\n");
 
     // Test ordre de convergence & complexité temporelle  -- on fait varier dt a T cst
     printf("Analyse ordre de convergence\n");
     printf("Analyse complexité temporelle\n");
-    //int Ndt = 17;
-    //double dt_range[17] = {0.0001, 0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0, 50.0, 100.0};
-    //int Ndt = 6;
-    //double dt_range[6] = {0.001, 0.002, 0.0025, 0.005, 0.0075, 0.015};
-    int Ndt = 23; Ndt = 22;
-    double dt_range[23] = {/*0.0001,*/ 0.001, 0.002, 0.0025, 0.005, 0.0075, 0.01, 0.015,
+
+    // Create sol_ref
+    double dt_range_ref[1] = {0.0001};
+    int Ndt_ref = 1;
+    T = 200;
+    //convergence_complexity(Ksp, Msp, 2*n, T, argv[5], dt_range_ref, Ndt_ref);
+
+    // Create solution for a range of dt
+    int Ndt = 22;
+    double dt_range[22] = { 0.001, 0.002, 0.0025, 0.005, 0.0075, 0.01, 0.015,
                             0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0,
                             2.0, 5.0, 10.0, 15.0, 20.0, 50.0, 100.0};
     T = 200;
-    convergence_complexity(Ksp, Msp, 2*n, T, argv[5], dt_range, Ndt);
+    //convergence_complexity(Ksp, Msp, 2*n, T, argv[5], dt_range, Ndt);
+    printf("\n\n");
+
+    // Test stabilité du schéma de Newmark
+    printf("Test stabilité du schéma de Newmark : rayon spectral\n");
+    run_stability_vs_dt(Ksp, Msp, n);
+    run_stability_vs_bg(Ksp, Msp, n);
 
     printf("==========================================================================================================================\n");
     printf("Fin des analyses\n");
