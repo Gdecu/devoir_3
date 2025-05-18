@@ -31,10 +31,10 @@ Pour obtenir les résultats de nos analyses il faut run chaque fichier python qu
 Sauf pour l'animation: étant donné qu'il était un peu lourd de fournir les 201 fichier.txt dans le fichier .zip, nous les avons pas inclus. Pour obtenir les données de l'animation, activez la ligne 195 dans `main.c` et ensuite run `py_plots/anim.py`.
 
 Pour obtenir les valeurs numériques (fichiers.txt) utilisez pour nous analyse, il faut activer les lignes suivants dans la fonction `main.c` :
-- `anim_enrgy(argv[5], Ksp, Msp, u, v, n, T, dt, nbr_iter)`
-- `convergence_complexity(Ksp, Msp, 2*n, T, argv[5])` 
-- `run_stability_vs_dt(Ksp, Msp, n);`
-- `run_stability_vs_bg(Ksp, Msp, n);`
+- `anim_enrgy(argv[5], Ksp, Msp, u, v, n, T, dt, nbr_iter)`  ligne 195
+- `convergence_complexity(Ksp, Msp, 2*n, T, argv[5])`  ligne 206 & 214
+- `run_stability_vs_dt(Ksp, Msp, n);` ligne 219
+- `run_stability_vs_bg(Ksp, Msp, n);` ligne 220
 et ensuite run chaque programmes pythons dans le dossier : `py_plot/`.
 
 ## Fichiers importants
