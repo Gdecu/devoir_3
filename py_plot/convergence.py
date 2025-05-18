@@ -46,12 +46,11 @@ linear_errors_u = np.log10((errors_u[:18]))
 linear_errors_v = np.log10(errors_v[:18])
 
 # Régression linéaire
-slope, intercept, r_value, p_value, std_err = linregress(linear_dt, linear_errors_u)
-p = np.log10(slope)
-p = 1.45
+slope, intercept, r_value, p_value, std_err = linregress(np.log10(linear_dt), np.log10(linear_errors_u))
+p = slope
 print(f"Ordre estimé de convergence : {p:.3f}")
-C = 4
-regr = 10**C *( dt_range )**(p)
+C = intercept
+regr = C *( dt_range )**(p)
 plt.figure()
 plt.loglog(dt_range, errors_u, 'o-', label='Erreur u', markersize=4)
 plt.loglog(dt_range, errors_v, 'o-', label='Erreur v', markersize=4)

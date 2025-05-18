@@ -117,7 +117,7 @@ void newmark_analyse(
     free(Aeff);
 }
 
-void analyse(char *initial_conditions, CSRMatrix *Ksp, CSRMatrix *Msp, double *u, double *v, int n, int T, double dt, int nbr_iter) {
+void anim_enrgy(char *initial_conditions, CSRMatrix *Ksp, CSRMatrix *Msp, double *u, double *v, int n, int T, double dt, int nbr_iter) {
 
     // On stocke l'état intiale
     get_intial_condition(initial_conditions, u, v, 2*n);
@@ -154,21 +154,18 @@ void get_coords(double *coord, int n_nodes, char *filename) {
 
 
 
-void convergence_complexity(CSRMatrix *Ksp, CSRMatrix *Msp, int N, double T, char *init){
+void convergence_complexity(CSRMatrix *Ksp, CSRMatrix *Msp, int N, double T, char *init, double *dt_range, int Ndt) {
 
-    //int Ndt = 17;
-    //double dt_range[17] = {0.0001, 0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0, 50.0, 100.0};
-    //int Ndt = 6;
-    //double dt_range[6] = {0.001, 0.002, 0.0025, 0.005, 0.0075, 0.015};
-    int Ndt = 23; Ndt = 22; Ndt -= 8;
-    double dt_range[23] = {/*0.0001, 0.001, 0.002, 0.0025, 0.005, 0.0075, 0.01, 0.015,
-                            0.02,*/ 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0,
-                            2.0, 5.0, 10.0, 15.0, 20.0, 50.0, 100.0};
-    T = 200;
     double dt = dt_range[0];
     int n_m;
     double *u = (double *)malloc( N * sizeof(double));
     double *v = (double *)malloc( N * sizeof(double));
+    double *u_moy = (double *)malloc( N * sizeof(double));
+    double *v_moy = (double *)malloc( N * sizeof(double));
+    for (int i = 0; i < N; i++) {
+        u_moy[i] = 0.0;
+        v_moy[i] = 0.0;
+    }
     double *t = (double *)malloc( (((int) T / dt ) + 1) * sizeof(double));
     printf("T = %f\ndt_min = %f, dt_max = %f; Ndt = %d\n\n", T, dt_range[0], dt_range[Ndt-1], Ndt);
 
@@ -178,22 +175,23 @@ void convergence_complexity(CSRMatrix *Ksp, CSRMatrix *Msp, int N, double T, cha
         perror("Failed to open complexity.txt");
     }
 
-    n_m = get_intial_condition(init, u, v, N);
     int node_I = 1; // Nœud I
 
 
     for (int i = 0; i < Ndt; i++) {
 
         // Récup condition initiale --> ds les quels on va stocker les u, v au temps T
-
+        n_m = get_intial_condition(init, u, v, N);
 
         dt = dt_range[i];
         int nbr_iter = (int) (T/ dt); // Nombre d'itérations de la méthode de Newmark
 
-        int pres = 5;                  // On effectue 10 fois la méthode de Newmark pour chaque dt pour plus de précision
+        int pres = 10;                  // On effectue 10 fois la méthode de Newmark pour chaque dt pour plus de précision
         double elapsed = 0.0;
 
+        printf("Calcul nr = ");
         for (int j = 0; j < pres; j++){
+            printf("%d / %d  ", j+1, pres);
             clock_t start = clock();
             newmark(
                 u, v,
@@ -205,7 +203,12 @@ void convergence_complexity(CSRMatrix *Ksp, CSRMatrix *Msp, int N, double T, cha
             );
             clock_t end = clock(); // Fin chrono
             elapsed += ((double)(end - start) / CLOCKS_PER_SEC) / pres;
+            for (int k = 0; k < N; k++) {
+                u_moy[k] += u[k] / pres;
+                v_moy[k] += v[k] / pres;
+            }
         }
+        printf("\n");
 
 
         printf("Itération %d : temps de calcul = %.8f secondes\n", i+1, elapsed);
@@ -214,12 +217,14 @@ void convergence_complexity(CSRMatrix *Ksp, CSRMatrix *Msp, int N, double T, cha
         char filename[64];
         snprintf(filename, sizeof filename, "./data/dt/final_dt%.5g.txt", dt);
         printf("✓ dt = %.5g  -> %s (%d itérations)\n", dt, filename, nbr_iter);
-        stock_final(n_m, filename, u, v);
+        stock_final(n_m, filename, u_moy, v_moy);
     } 
     fclose(complexity_file);
     free(t);
     free(u);
     free(v);
+    free(u_moy);
+    free(v_moy);
 }
 
 

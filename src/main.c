@@ -87,12 +87,6 @@ int main(int argc, char *argv[]) {
     add_bulk_source(model, rhs);
     enforce_bd_conditions(model, rhs);
 
-
-
-    // Récup les coords du modèle
-    char *filename = "./data/coords.txt";
-    get_coords(model->coords, model->n_node, filename);
-
     SymBandMatrix *Kbd = model->K;
     SymBandMatrix *Mbd = model->M;
     CSRMatrix *Ksp = band_to_sym_csr(Kbd);
@@ -101,10 +95,13 @@ int main(int argc, char *argv[]) {
     //CG(Ksp->n, Ksp->row_ptr, Ksp->col_idx, Ksp->data, rhs, sol, eps);    
     //display_sol(model, sol);
 
-    // Début modif
-    // Devoir 3
+    //
+    // Début de l'implémentation du devoir 3 : la méthode de Newmark
+    //
 
-    printf("Début de la méthode de Newmark\n\n");
+    printf("==========================================================================================================================\n");
+    printf("Début de l'implémentation du devoir 3 : la méthode de Newmark\n");
+    printf("==========================================================================================================================\n\n");
     // Récup ux_i uy_i vx_i vy_i de <initial.txt>
     int nnz = Ksp->nnz;
     int n = Ksp->n;
@@ -170,30 +167,50 @@ int main(int argc, char *argv[]) {
     printf("Stockage dans <time.txt> le déplacement et la vitesse d’un nœud I à chaque itération temporelle\n");
     stock_time(nbr_iter+1, argv[7], t, uxI, uyI, vxI, vyI);
 
-    printf("\n\n");
+    printf("==========================================================================================================================\n");
+    printf("Fin de l'implémentation du devoir 3 : la méthode de Newmark\n");
+    printf("==========================================================================================================================\n\n");
 
-    // Display the solution
-    //printf("Displaying the solution...\n\n");
-    //display_sol(model, sol);
+    //
+    // Fin de l'implémentation du devoir 3 : la méthode de Newmark
+    //
 
     //
     // Analyses
     //
+    printf("==========================================================================================================================\n");
+    printf("Début des analyses\n");
+    printf("==========================================================================================================================\n\n");
+
+    // Récup les coords du modèle (utile pour l'animation)
+    printf("Récup les coords du modèle (utile pour l'animation)\n\n");
+    char *filename = "./data/coords.txt";
+    get_coords(model->coords, model->n_node, filename);
 
     // Verification que l'énergie cinétique et potentielle sont conservées
     printf("Verification que l'énergie cinétique et potentielle sont conservées\n");
     // Animation
     printf("Récupreration de %d etats final pour la simulation\n\n", nbr_iter);
-    analyse(argv[5], Ksp, Msp, u, v, n, T, dt, nbr_iter);
+    anim_enrgy(argv[5], Ksp, Msp, u, v, n, T, dt, nbr_iter);
     printf("\n\n");
 
-    // Test ordre de convergence
-    printf("Test ordre de convergence\n");
-    // Test complexité temporelle
-    printf("Test complexité temporelle\n");
-    convergence_complexity(Ksp, Msp, 2*n, T, argv[5]);
+    // Test ordre de convergence & complexité temporelle  -- on fait varier dt a T cst
+    printf("Analyse ordre de convergence\n");
+    printf("Analyse complexité temporelle\n");
+    //int Ndt = 17;
+    //double dt_range[17] = {0.0001, 0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 20.0, 50.0, 100.0};
+    //int Ndt = 6;
+    //double dt_range[6] = {0.001, 0.002, 0.0025, 0.005, 0.0075, 0.015};
+    int Ndt = 23; Ndt = 22;
+    double dt_range[23] = {/*0.0001,*/ 0.001, 0.002, 0.0025, 0.005, 0.0075, 0.01, 0.015,
+                            0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0,
+                            2.0, 5.0, 10.0, 15.0, 20.0, 50.0, 100.0};
+    T = 200;
+    convergence_complexity(Ksp, Msp, 2*n, T, argv[5], dt_range, Ndt);
 
-
+    printf("==========================================================================================================================\n");
+    printf("Fin des analyses\n");
+    printf("==========================================================================================================================\n\n");
 
 
     free(u);
