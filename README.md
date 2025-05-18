@@ -35,6 +35,7 @@ Pour obtenir les valeurs numériques (fichiers.txt) utilisez pour nous analyse, 
 - `convergence_complexity(Ksp, Msp, 2*n, T, argv[5])`  ligne 206 & 214
 - `run_stability_vs_dt(Ksp, Msp, n);` ligne 219
 - `run_stability_vs_bg(Ksp, Msp, n);` ligne 220,
+- 
 et ensuite run chaque programmes pythons dans le dossier : `py_plot/`.
 
 ## Fichiers importants
